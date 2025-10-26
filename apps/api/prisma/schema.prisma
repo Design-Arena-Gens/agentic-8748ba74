@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  FACULTY
+  GUARDIAN
+  STUDENT
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id            String         @id @default(uuid())
+  name          String
+  email         String         @unique
+  password      String
+  role          Role
+  institution   Institution?   @relation(fields: [institutionId], references: [id])
+  institutionId String?
+  students      Student[]      @relation("StudentGuardian")
+  notes         Note[]         @relation("NoteAuthor")
+  alerts        Alert[]        @relation("AlertCreator")
+  refreshTokens RefreshToken[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([institutionId])
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String
+  tokenId   String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Institution {
+  id           String    @id @default(uuid())
+  name         String
+  location     String?
+  studentCount Int       @default(0)
+  users        User[]
+  students     Student[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([name])
+}
+
+model Student {
+  id             String       @id @default(uuid())
+  firstName      String
+  lastName       String
+  email          String?      @unique
+  institution    Institution? @relation(fields: [institutionId], references: [id])
+  institutionId  String?
+  guardian       User?        @relation("StudentGuardian", fields: [guardianId], references: [id])
+  guardianId     String?
+  metrics        Metric?
+  alerts         Alert[]
+  notes          Note[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([institutionId])
+}
+
+model Metric {
+  id                String   @id @default(uuid())
+  student           Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId         String   @unique
+  gpa               Float
+  attendance        Int
+  assignmentsOnTime Float
+  quizAvg           Float
+  lmsActivity       Float
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Alert {
+  id          String        @id @default(uuid())
+  message     String
+  severity    AlertSeverity
+  student     Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   String
+  createdBy   User?         @relation("AlertCreator", fields: [createdById], references: [id])
+  createdById String?
+  read        Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([studentId])
+  @@index([createdById])
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  content   String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId String
+  author    User?    @relation("NoteAuthor", fields: [authorId], references: [id])
+  authorId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([authorId])
+}
